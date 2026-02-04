@@ -265,6 +265,80 @@
         .filter-btn.inactive:hover {
             background: #e2e8f0;
         }
+        
+        /* Notifikasi Pesan */
+        .notification-badge {
+            position: absolute;
+            top: -5px;
+            right: -5px;
+            background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+            color: white;
+            font-size: 11px;
+            font-weight: 600;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s infinite;
+            box-shadow: 0 3px 10px rgba(245, 158, 11, 0.3);
+        }
+        
+        .notification-shine {
+            background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 50%, #d97706 100%);
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.7);
+        }
+        
+        .notification-modal {
+            max-width: 600px;
+        }
+        
+        .message-item {
+            border-left: 4px solid #3b82f6;
+            padding-left: 15px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+        }
+        
+        .message-item:hover {
+            background: #f8fafc;
+            transform: translateX(5px);
+        }
+        
+        .message-unread {
+            border-left-color: #f59e0b;
+            background: linear-gradient(to right, rgba(245, 158, 11, 0.05), transparent);
+        }
+        
+        @keyframes shine {
+            0% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+            50% { box-shadow: 0 0 20px rgba(245, 158, 11, 0.8); }
+            100% { box-shadow: 0 0 10px rgba(245, 158, 11, 0.5); }
+        }
+        
+        .notification-button {
+            animation: shine 2s infinite;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .notification-button::after {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transform: rotate(45deg);
+            animation: slide 3s infinite linear;
+        }
+        
+        @keyframes slide {
+            0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
+        }
     </style>
 </head>
 <body class="text-gray-800 min-h-screen">
@@ -325,13 +399,20 @@
     
     <!-- Dashboard Container (Hidden by default) -->
     <div id="dashboardContainer" class="max-w-7xl mx-auto px-4 py-6 hidden fade-in">
-        <!-- Header -->
-        <div class="flex flex-col md:flex-row md:items-center justify-between mb-8">
+        <!-- Header dengan Notifikasi -->
+        <div class="flex flex-col md:flex-row md:items-center justify-between mb-6">
             <div>
                 <h1 class="text-2xl md:text-3xl font-bold text-gray-900">📊 Dashboard Monitoring Riset</h1>
                 <p class="text-gray-600 mt-2">Pantau progress penelitian Anda di sini</p>
             </div>
             <div class="flex items-center space-x-3 mt-4 md:mt-0">
+                <!-- Tombol Notifikasi Pesan -->
+                <button id="notificationButton" onclick="openMessageModal()" 
+                        class="px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white rounded-lg font-medium transition shadow-lg relative notification-button hidden">
+                    <i class="fas fa-envelope mr-2"></i> Pesan Masuk
+                    <div id="notificationBadge" class="notification-badge hidden"></div>
+                </button>
+                
                 <button onclick="refreshProgressData()" class="px-4 py-2.5 btn-secondary rounded-lg font-medium">
                     <i class="fas fa-sync-alt mr-2"></i> Refresh
                 </button>
@@ -629,17 +710,66 @@
             </form>
         </div>
     </div>
+    
+    <!-- Modal Pesan Masuk -->
+    <div id="messageModal" class="modal-overlay">
+        <div class="modal-content notification-modal">
+            <div class="flex justify-between items-center mb-6 pb-4 border-b border-gray-200">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-900">✉️ Pesan Masuk</h2>
+                    <p class="text-gray-600 text-sm mt-1">Pesan untuk kelompok Anda</p>
+                </div>
+                <button onclick="closeMessageModal()" class="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center transition">
+                    <i class="fas fa-times text-gray-600"></i>
+                </button>
+            </div>
+            
+            <!-- Daftar Pesan -->
+            <div id="messagesList" class="space-y-4 max-h-96 overflow-y-auto scrollbar-thin pr-2">
+                <div class="flex flex-col items-center justify-center py-10">
+                    <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
+                    <p class="text-gray-600">Memuat pesan...</p>
+                </div>
+            </div>
+            
+            <!-- Status Pesan -->
+            <div id="messageStatus" class="text-center text-sm mt-4 min-h-6"></div>
+            
+            <!-- Empty State Pesan -->
+            <div id="emptyMessages" class="hidden text-center py-10">
+                <div class="inline-flex items-center justify-center w-20 h-20 rounded-full bg-gray-100 mb-5">
+                    <i class="fas fa-envelope-open-text text-3xl text-gray-400"></i>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mb-2">Belum Ada Pesan</h3>
+                <p class="text-gray-600 max-w-md mx-auto">Belum ada pesan untuk kelompok Anda. Pesan akan muncul di sini jika dosen atau koordinator mengirimkan pesan untuk kelompok Anda.</p>
+            </div>
+            
+            <!-- Action Buttons -->
+            <div class="flex space-x-3 pt-6 mt-6 border-t border-gray-200">
+                <button onclick="closeMessageModal()" 
+                        class="flex-1 py-3 btn-secondary rounded-xl font-medium">
+                    <i class="fas fa-times mr-2"></i> Tutup
+                </button>
+                <button onclick="refreshMessages()" 
+                        class="flex-1 py-3 btn-primary rounded-xl font-medium">
+                    <i class="fas fa-sync-alt mr-2"></i> Refresh Pesan
+                </button>
+            </div>
+        </div>
+    </div>
 
     <script>
         // Konfigurasi API
         const LOGIN_API = "https://script.google.com/macros/s/AKfycbzQbSGEpEX7sXNzPkGc862tm9fqTTcCNoXgNvwsCNLkjEtz3BCXKV0yrH-U1teRmf8x/exec";
         const SUBMIT_API = "https://script.google.com/macros/s/AKfycbwcpWSTNXmnlGBtGJGQ_cdE7py3XcjnBlobMCpxLD-ngmoGO0VZD2IJ9w--MjTWKsKhqA/exec";
         const SPREADSHEET_ID = "108-o2wcOAHNrm1BlBl8YTj1H2YhQxs3WLLcEhJYb1hY";
+        const MESSAGE_SPREADSHEET_ID = "11Y5ogELKeWNTGLNkicwlA1vywvxGryHUSB0VszktNPc";
         
         // Variabel global
         let loggedInData = null;
         let allProgressData = []; // Menyimpan semua data progress
         let filteredProgressData = []; // Data yang difilter
+        let groupMessages = []; // Menyimpan pesan untuk kelompok
         const semuaBagian = [
             "Judul Penelitian", 
             "BAB 1 Pendahuluan", 
@@ -655,7 +785,37 @@
         const hariIndo = ["Minggu", "Senin", "Selasa", "Rabu", "Kamis", "Jumat", "Sabtu"];
         const bulanIndo = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
         
-        // Fungsi untuk format tanggal: EEEE, dd/MM/yyyy
+        // Format timestamp: DD/MM/YYYY HH:MM:SS
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return "-";
+            
+            try {
+                const date = new Date(timestamp);
+                const day = date.getDate().toString().padStart(2, '0');
+                const month = (date.getMonth() + 1).toString().padStart(2, '0');
+                const year = date.getFullYear();
+                const hours = date.getHours().toString().padStart(2, '0');
+                const minutes = date.getMinutes().toString().padStart(2, '0');
+                const seconds = date.getSeconds().toString().padStart(2, '0');
+                
+                return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+            } catch (e) {
+                // Jika parsing gagal, coba format lain
+                if (typeof timestamp === 'string') {
+                    // Coba ekstrak tanggal dari string
+                    const dateMatch = timestamp.match(/\d{4}[-/]\d{2}[-/]\d{2}/);
+                    if (dateMatch) {
+                        const parts = dateMatch[0].split(/[-/]/);
+                        if (parts.length === 3) {
+                            return `${parts[2]}/${parts[1]}/${parts[0]} ${timestamp.includes(':') ? timestamp.split(' ')[1] || '00:00:00' : '00:00:00'}`;
+                        }
+                    }
+                }
+                return timestamp.toString();
+            }
+        }
+        
+        // Format tanggal: EEEE, dd/MM/yyyy
         function formatTanggal(dateValue, includeTime = false) {
             if (!dateValue) return "-";
             
@@ -771,6 +931,9 @@
                         
                         // Muat data progress
                         loadProgressData();
+                        
+                        // Muat pesan untuk kelompok
+                        loadMessages();
                     }, 800);
                     
                 } else {
@@ -780,6 +943,237 @@
                 console.error("Error:", error);
                 info.innerHTML = '<div class="inline-flex items-center px-4 py-2.5 bg-rose-50 text-rose-700 rounded-lg border border-rose-200"><i class="fas fa-exclamation-circle mr-2"></i> Terjadi kesalahan jaringan. Coba lagi.</div>';
             }
+        }
+        
+        // Fungsi untuk memuat pesan dari spreadsheet
+        async function loadMessages() {
+            try {
+                // URL untuk mengambil data pesan dari spreadsheet
+                const messageUrl = `https://docs.google.com/spreadsheets/d/${MESSAGE_SPREADSHEET_ID}/gviz/tq?tqx=out:json`;
+                
+                // Mengambil data dari spreadsheet
+                const response = await fetch(messageUrl);
+                const text = await response.text();
+                
+                // Parse data JSON dari Google Sheets
+                const jsonText = text.substring(text.indexOf('{'), text.lastIndexOf('}') + 1);
+                const data = JSON.parse(jsonText);
+                
+                // Proses data pesan
+                processMessageData(data);
+                
+            } catch (error) {
+                console.error("Error loading messages:", error);
+                showMessageError();
+            }
+        }
+        
+        // Fungsi untuk memproses data pesan
+        function processMessageData(data) {
+            // Mendapatkan header kolom
+            const columns = data.table.cols.map(col => col.label || "");
+            
+            // Mendapatkan baris data
+            const rows = data.table.rows;
+            
+            // Cari indeks kolom yang dibutuhkan
+            const timestampIndex = columns.findIndex(col => col.toLowerCase().includes("timestamp") || col === "Timestamp");
+            const ketuaIndex = columns.findIndex(col => col.toLowerCase().includes("nama ketua") || col.toLowerCase().includes("ketua") || col === "Nama Ketua");
+            const anggotaIndex = columns.findIndex(col => col.toLowerCase().includes("nama anggota") || col.toLowerCase().includes("anggota") || col === "Nama Anggota");
+            const pesanIndex = columns.findIndex(col => col.toLowerCase().includes("pesan") || col === "Pesan untuk kelompok");
+            
+            // Reset data
+            groupMessages = [];
+            
+            // Proses semua baris data
+            rows.forEach(row => {
+                const cellValues = row.c.map(cell => cell ? (cell.v || "") : "");
+                
+                // Ambil data pesan
+                const timestamp = timestampIndex >= 0 ? cellValues[timestampIndex] : new Date();
+                const ketua = ketuaIndex >= 0 ? (cellValues[ketuaIndex] || "").toString() : "";
+                const anggota = anggotaIndex >= 0 ? (cellValues[anggotaIndex] || "").toString() : "";
+                const pesan = pesanIndex >= 0 ? (cellValues[pesanIndex] || "") : "";
+                
+                // Cocokkan dengan data login (gunakan nama depan)
+                const loggedKetua = loggedInData ? loggedInData.user.toLowerCase() : "";
+                const loggedAnggota = loggedInData ? loggedInData.pass.toLowerCase() : "";
+                
+                // Jika data cocok, tambahkan ke groupMessages
+                if (loggedKetua && loggedAnggota) {
+                    const ketuaLower = ketua.toLowerCase();
+                    const anggotaLower = anggota.toLowerCase();
+                    
+                    if ((ketuaLower.includes(loggedKetua) && anggotaLower.includes(loggedAnggota)) ||
+                        (ketua === "" && anggota === "")) { // Pesan untuk semua kelompok
+                        
+                        const messageItem = {
+                            timestamp: timestamp,
+                            formattedTimestamp: formatTimestamp(timestamp),
+                            ketua: ketua,
+                            anggota: anggota,
+                            pesan: pesan,
+                            dateObj: new Date(timestamp),
+                            isRead: false // Default belum dibaca
+                        };
+                        
+                        groupMessages.push(messageItem);
+                    }
+                }
+            });
+            
+            // Urutkan data dari yang terbaru (berdasarkan timestamp)
+            groupMessages.sort((a, b) => b.dateObj - a.dateObj);
+            
+            // Update notifikasi
+            updateNotification();
+            
+            // Update tampilan pesan di modal jika modal terbuka
+            if (document.getElementById("messageModal").style.display === "flex") {
+                displayMessages();
+            }
+        }
+        
+        // Fungsi untuk update notifikasi
+        function updateNotification() {
+            const notificationButton = document.getElementById("notificationButton");
+            const notificationBadge = document.getElementById("notificationBadge");
+            
+            if (groupMessages.length > 0) {
+                // Hitung pesan yang belum dibaca
+                const unreadCount = groupMessages.filter(msg => !msg.isRead).length;
+                
+                // Tampilkan tombol notifikasi
+                notificationButton.classList.remove("hidden");
+                
+                // Update badge
+                if (unreadCount > 0) {
+                    notificationBadge.classList.remove("hidden");
+                    notificationBadge.textContent = unreadCount;
+                    
+                    // Tambahkan efek bersinar jika ada pesan baru
+                    if (unreadCount > 0) {
+                        notificationButton.classList.add("notification-shine");
+                    }
+                } else {
+                    notificationBadge.classList.add("hidden");
+                    notificationButton.classList.remove("notification-shine");
+                }
+            } else {
+                // Sembunyikan tombol notifikasi jika tidak ada pesan
+                notificationButton.classList.add("hidden");
+                notificationBadge.classList.add("hidden");
+            }
+        }
+        
+        // Fungsi untuk menampilkan pesan di modal
+        function displayMessages() {
+            const messagesList = document.getElementById("messagesList");
+            const emptyMessages = document.getElementById("emptyMessages");
+            const messageStatus = document.getElementById("messageStatus");
+            
+            if (groupMessages.length === 0) {
+                messagesList.classList.add("hidden");
+                emptyMessages.classList.remove("hidden");
+                messageStatus.innerHTML = "";
+                return;
+            }
+            
+            messagesList.classList.remove("hidden");
+            emptyMessages.classList.add("hidden");
+            messagesList.innerHTML = "";
+            
+            groupMessages.forEach((message, index) => {
+                const messageClass = message.isRead ? "message-item" : "message-item message-unread";
+                
+                const messageElement = document.createElement("div");
+                messageElement.className = messageClass;
+                messageElement.onclick = () => markMessageAsRead(index);
+                
+                messageElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-2">
+                        <div>
+                            <span class="text-xs font-semibold px-2 py-1 rounded bg-blue-100 text-blue-800">
+                                ${message.ketua && message.anggota ? `Untuk: ${message.ketua} & ${message.anggota}` : "Pesan Umum"}
+                            </span>
+                        </div>
+                        <div class="text-xs text-gray-500">${message.formattedTimestamp}</div>
+                    </div>
+                    <div class="text-gray-700">
+                        ${message.pesan}
+                    </div>
+                    ${!message.isRead ? '<div class="text-xs text-amber-600 font-medium mt-2"><i class="fas fa-circle mr-1 text-xs"></i> Baru</div>' : ''}
+                `;
+                
+                messagesList.appendChild(messageElement);
+            });
+            
+            // Update status
+            const unreadCount = groupMessages.filter(msg => !msg.isRead).length;
+            if (unreadCount > 0) {
+                messageStatus.innerHTML = `<div class="inline-flex items-center px-3 py-1.5 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
+                    <i class="fas fa-envelope mr-2"></i> ${unreadCount} pesan belum dibaca
+                </div>`;
+            } else {
+                messageStatus.innerHTML = `<div class="inline-flex items-center px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-lg border border-emerald-200">
+                    <i class="fas fa-check-circle mr-2"></i> Semua pesan telah dibaca
+                </div>`;
+            }
+        }
+        
+        // Fungsi untuk menandai pesan sebagai sudah dibaca
+        function markMessageAsRead(index) {
+            if (index >= 0 && index < groupMessages.length) {
+                groupMessages[index].isRead = true;
+                
+                // Update tampilan
+                displayMessages();
+                
+                // Update notifikasi
+                updateNotification();
+            }
+        }
+        
+        // Fungsi untuk membuka modal pesan
+        function openMessageModal() {
+            document.getElementById("messageModal").style.display = "flex";
+            displayMessages();
+        }
+        
+        // Fungsi untuk menutup modal pesan
+        function closeMessageModal() {
+            document.getElementById("messageModal").style.display = "none";
+        }
+        
+        // Fungsi untuk refresh pesan
+        async function refreshMessages() {
+            const refreshBtn = event.target.closest('button');
+            const originalHtml = refreshBtn.innerHTML;
+            refreshBtn.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Loading...';
+            refreshBtn.disabled = true;
+            
+            await loadMessages();
+            
+            setTimeout(() => {
+                refreshBtn.innerHTML = originalHtml;
+                refreshBtn.disabled = false;
+            }, 1000);
+        }
+        
+        // Fungsi untuk menampilkan error pesan
+        function showMessageError() {
+            const messagesList = document.getElementById("messagesList");
+            messagesList.innerHTML = `
+                <div class="text-center py-10">
+                    <div class="inline-flex items-center px-4 py-3 bg-rose-50 text-rose-700 rounded-lg border border-rose-200">
+                        <i class="fas fa-exclamation-triangle mr-3"></i>
+                        <div class="text-left">
+                            <p class="font-medium">Gagal memuat pesan</p>
+                            <p class="text-sm mt-1">Coba refresh atau periksa koneksi internet</p>
+                        </div>
+                    </div>
+                </div>
+            `;
         }
         
         // Fungsi untuk memformat judul penelitian agar lebih rapi
@@ -1164,10 +1558,12 @@
             loggedInData = null;
             allProgressData = [];
             filteredProgressData = [];
+            groupMessages = [];
             
             // Kembali ke halaman login
             document.getElementById("dashboardContainer").classList.add("hidden");
             document.getElementById("floatingBtn").classList.add("hidden");
+            document.getElementById("notificationButton").classList.add("hidden");
             document.getElementById("loginContainer").classList.remove("hidden");
             document.getElementById("loginContainer").classList.add("fade-in");
         }
@@ -1189,6 +1585,11 @@
             // Close modal ketika klik di luar modal
             document.getElementById("modalOverlay").addEventListener("click", function(e) {
                 if (e.target === this) closeModal();
+            });
+            
+            // Close modal pesan ketika klik di luar modal
+            document.getElementById("messageModal").addEventListener("click", function(e) {
+                if (e.target === this) closeMessageModal();
             });
         });
     </script>
