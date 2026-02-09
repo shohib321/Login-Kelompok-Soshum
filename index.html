@@ -339,6 +339,14 @@
             0% { transform: translateX(-100%) translateY(-100%) rotate(45deg); }
             100% { transform: translateX(100%) translateY(100%) rotate(45deg); }
         }
+        
+        /* Tooltip untuk teks panjang */
+        .truncate-cell {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
     </style>
 </head>
 <body class="text-gray-800 min-h-screen">
@@ -549,16 +557,17 @@
                     <table class="min-w-full divide-y divide-gray-200">
                         <thead class="table-header">
                             <tr>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Tanggal</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bagian Dikerjakan</th>
-                                <th class="px6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ketercapaian</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Kendala</th>
-                                <th class="px-6 py-4 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Solusi</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Timestamp</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Bagian Dikerjakan</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Ketercapaian</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Kendala</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Solusi</th>
+                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Rencana Minggu Depan</th>
                             </tr>
                         </thead>
                         <tbody id="progressTable" class="divide-y divide-gray-100">
                             <tr>
-                                <td colspan="5" class="px-6 py-10 text-center">
+                                <td colspan="6" class="px-6 py-10 text-center">
                                     <div class="flex flex-col items-center justify-center">
                                         <i class="fas fa-spinner fa-spin text-3xl text-blue-500 mb-3"></i>
                                         <p class="text-gray-600">Memuat data progress...</p>
@@ -693,6 +702,15 @@
                         class="w-full" required></textarea>
                 </div>
                 
+                <!-- Rencana Minggu Depan -->
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">
+                        <i class="fas fa-calendar-check mr-1 text-indigo-600"></i> Rencana Minggu Depan *
+                    </label>
+                    <textarea id="rencana" rows="2" placeholder="Rencana pengerjaan untuk minggu depan" 
+                        class="w-full" required></textarea>
+                </div>
+                
                 <!-- Status Message -->
                 <div id="formStatus" class="text-center text-sm min-h-6 py-2"></div>
                 
@@ -790,27 +808,44 @@
             if (!timestamp) return "-";
             
             try {
-                const date = new Date(timestamp);
+                // Coba parse timestamp dari berbagai format
+                let date;
+                if (typeof timestamp === 'string') {
+                    // Cek format ISO
+                    if (timestamp.includes('T')) {
+                        date = new Date(timestamp);
+                    } 
+                    // Cek format dengan slash
+                    else if (timestamp.includes('/')) {
+                        const parts = timestamp.split(/[/ :]/);
+                        if (parts.length >= 3) {
+                            date = new Date(parts[2], parts[1] - 1, parts[0], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+                        }
+                    }
+                    // Cek format dengan dash
+                    else if (timestamp.includes('-')) {
+                        const parts = timestamp.split(/[- :]/);
+                        if (parts.length >= 3) {
+                            date = new Date(parts[0], parts[1] - 1, parts[2], parts[3] || 0, parts[4] || 0, parts[5] || 0);
+                        }
+                    }
+                }
+                
+                // Jika parsing gagal, coba buat Date object langsung
+                if (!date || isNaN(date.getTime())) {
+                    date = new Date(timestamp);
+                }
+                
+                // Format tanggal
                 const day = date.getDate().toString().padStart(2, '0');
                 const month = (date.getMonth() + 1).toString().padStart(2, '0');
                 const year = date.getFullYear();
                 const hours = date.getHours().toString().padStart(2, '0');
                 const minutes = date.getMinutes().toString().padStart(2, '0');
-                const seconds = date.getSeconds().toString().padStart(2, '0');
                 
-                return `${day}/${month}/${year} ${hours}:${minutes}:${seconds}`;
+                return `${day}/${month}/${year} ${hours}:${minutes}`;
             } catch (e) {
-                // Jika parsing gagal, coba format lain
-                if (typeof timestamp === 'string') {
-                    // Coba ekstrak tanggal dari string
-                    const dateMatch = timestamp.match(/\d{4}[-/]\d{2}[-/]\d{2}/);
-                    if (dateMatch) {
-                        const parts = dateMatch[0].split(/[-/]/);
-                        if (parts.length === 3) {
-                            return `${parts[2]}/${parts[1]}/${parts[0]} ${timestamp.includes(':') ? timestamp.split(' ')[1] || '00:00:00' : '00:00:00'}`;
-                        }
-                    }
-                }
+                console.error("Error formatting timestamp:", e);
                 return timestamp.toString();
             }
         }
@@ -820,7 +855,28 @@
             if (!dateValue) return "-";
             
             try {
-                const date = new Date(dateValue);
+                let date;
+                if (typeof dateValue === 'string') {
+                    // Coba parse tanggal dari berbagai format
+                    if (dateValue.includes('T')) {
+                        date = new Date(dateValue);
+                    } else if (dateValue.includes('/')) {
+                        const parts = dateValue.split(/[/ :]/);
+                        if (parts.length >= 3) {
+                            date = new Date(parts[2], parts[1] - 1, parts[0]);
+                        }
+                    } else if (dateValue.includes('-')) {
+                        const parts = dateValue.split(/[- :]/);
+                        if (parts.length >= 3) {
+                            date = new Date(parts[0], parts[1] - 1, parts[2]);
+                        }
+                    }
+                }
+                
+                if (!date || isNaN(date.getTime())) {
+                    date = new Date(dateValue);
+                }
+                
                 const hari = hariIndo[date.getDay()];
                 const tanggal = date.getDate().toString().padStart(2, '0');
                 const bulan = (date.getMonth() + 1).toString().padStart(2, '0');
@@ -836,14 +892,7 @@
                 
                 return result;
             } catch (e) {
-                // Jika parsing gagal, coba format lain
-                if (typeof dateValue === 'string') {
-                    // Coba ekstrak tanggal dari string
-                    const dateMatch = dateValue.match(/\d{4}-\d{2}-\d{2}/);
-                    if (dateMatch) {
-                        return formatTanggal(dateMatch[0], includeTime);
-                    }
-                }
+                console.error("Error formatting date:", e);
                 return dateValue.toString();
             }
         }
@@ -1242,22 +1291,107 @@
             }, 1000);
         }
         
-        // Fungsi untuk memproses data progress
+        // Fungsi untuk debug: Tampilkan semua kolom yang ada di spreadsheet
+        function debugColumns(columns) {
+            console.log("Daftar kolom yang ditemukan:");
+            columns.forEach((col, index) => {
+                console.log(`${index}: "${col}"`);
+            });
+        }
+        
+        // Fungsi untuk memproses data progress dari spreadsheet
         function processProgressData(data) {
             // Mendapatkan header kolom
             const columns = data.table.cols.map(col => col.label || "");
             
+            // Debug: Tampilkan kolom untuk memastikan mapping benar
+            debugColumns(columns);
+            
             // Mendapatkan baris data
             const rows = data.table.rows;
             
-            // Cari indeks kolom yang dibutuhkan
-            const ketuaIndex = columns.findIndex(col => col.toLowerCase().includes("nama ketua") || col.toLowerCase().includes("ketua") || col === "Nama Ketua");
-            const anggotaIndex = columns.findIndex(col => col.toLowerCase().includes("nama anggota") || col.toLowerCase().includes("anggota") || col === "Nama Anggota");
-            const timestampIndex = columns.findIndex(col => col.toLowerCase().includes("timestamp") || col.toLowerCase().includes("waktu") || col === "Timestamp");
-            const bagianIndex = columns.findIndex(col => col.toLowerCase().includes("bagian") || col.toLowerCase().includes("dikerjakan") || col === "Bagian yang Sudah Dikerjakan");
-            const ketercapaianIndex = columns.findIndex(col => col.toLowerCase().includes("ketercapaian") || col.toLowerCase().includes("pekan") || col === "Ketercapaian Pekan Ini");
-            const kendalaIndex = columns.findIndex(col => col.toLowerCase().includes("kendala") || col.toLowerCase().includes("masalah") || col === "Kendala yang Dihadapi");
-            const solusiIndex = columns.findIndex(col => col.toLowerCase().includes("solusi") || col.toLowerCase().includes("link") || col === "Solusi");
+            // Cari indeks kolom berdasarkan struktur spreadsheet ANDA
+            // Berdasarkan link spreadsheet Anda, kolomnya adalah:
+            // 1. Timestamp
+            // 2. Nama Ketua
+            // 3. Nama Anggota
+            // 4. Kategori Penelitian
+            // 5. Rencana Judul Penelitian
+            // 6. Bagian sudah di kerjakan
+            // 7. Keterangan Ketercapaian Pekan ini
+            // 8. Kendala dihadapi
+            // 9. Solusi
+            // 10. Rencana Minggu Depan
+            
+            const timestampIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("timestamp") || 
+                col.toLowerCase().includes("stempel") || 
+                col === "Timestamp"
+            );
+            
+            const ketuaIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("nama ketua") || 
+                col.toLowerCase().includes("ketua") || 
+                col === "Nama Ketua"
+            );
+            
+            const anggotaIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("nama anggota") || 
+                col.toLowerCase().includes("anggota") || 
+                col === "Nama Anggota"
+            );
+            
+            const kategoriIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("kategori") || 
+                col === "Kategori Penelitian"
+            );
+            
+            const judulIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("judul") || 
+                col.toLowerCase().includes("rencana judul") || 
+                col === "Rencana Judul Penelitian"
+            );
+            
+            const bagianIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("bagian") || 
+                col.toLowerCase().includes("dikerjakan") || 
+                col === "Bagian sudah di kerjakan" ||
+                col === "Bagian sudah dikerjakan"
+            );
+            
+            const ketercapaianIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("ketercapaian") || 
+                col.toLowerCase().includes("pekan") || 
+                col === "Keterangan Ketercapaian Pekan ini" ||
+                col === "Keterangan Ketercapaian Pekan ini"
+            );
+            
+            const kendalaIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("kendala") || 
+                col === "Kendala dihadapi"
+            );
+            
+            const solusiIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("solusi") || 
+                col === "Solusi"
+            );
+            
+            const rencanaIndex = columns.findIndex(col => 
+                col.toLowerCase().includes("rencana") && col.toLowerCase().includes("minggu") || 
+                col === "Rencana Minggu Depan"
+            );
+            
+            console.log("Indeks kolom yang ditemukan:");
+            console.log("timestampIndex:", timestampIndex);
+            console.log("ketuaIndex:", ketuaIndex);
+            console.log("anggotaIndex:", anggotaIndex);
+            console.log("kategoriIndex:", kategoriIndex);
+            console.log("judulIndex:", judulIndex);
+            console.log("bagianIndex:", bagianIndex);
+            console.log("ketercapaianIndex:", ketercapaianIndex);
+            console.log("kendalaIndex:", kendalaIndex);
+            console.log("solusiIndex:", solusiIndex);
+            console.log("rencanaIndex:", rencanaIndex);
             
             // Reset data
             allProgressData = [];
@@ -1284,6 +1418,7 @@
                         ketercapaian: ketercapaianIndex >= 0 ? (cellValues[ketercapaianIndex] || "") : "",
                         kendala: kendalaIndex >= 0 ? (cellValues[kendalaIndex] || "") : "",
                         solusi: solusiIndex >= 0 ? (cellValues[solusiIndex] || "") : "",
+                        rencana: rencanaIndex >= 0 ? (cellValues[rencanaIndex] || "") : "",
                         dateObj: new Date(timestamp)
                     };
                     
@@ -1295,6 +1430,8 @@
                     }
                 }
             });
+            
+            console.log("Total data ditemukan untuk kelompok ini:", allProgressData.length);
             
             // Urutkan data dari yang terbaru (berdasarkan timestamp)
             allProgressData.sort((a, b) => b.dateObj - a.dateObj);
@@ -1361,7 +1498,7 @@
             if (filteredProgressData.length === 0) {
                 table.innerHTML = `
                     <tr>
-                        <td colspan="5" class="px-6 py-10 text-center">
+                        <td colspan="6" class="px-6 py-10 text-center">
                             <div class="inline-flex items-center px-4 py-3 bg-amber-50 text-amber-700 rounded-lg border border-amber-200">
                                 <i class="fas fa-info-circle mr-3"></i>
                                 <div class="text-left">
@@ -1381,30 +1518,29 @@
                 const tr = document.createElement("tr");
                 tr.className = "table-row";
                 
-                // Timestamp dengan format: EEEE, dd/MM/yyyy
-                const timestamp = formatTanggal(item.timestamp, true);
-                tr.innerHTML += `<td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
-                    <div class="font-semibold">${timestamp.split(' ')[0]}</div>
-                    <div class="text-xs text-gray-500">${timestamp.split(' ')[1]}</div>
+                // Timestamp dengan format: dd/MM/yyyy HH:MM
+                const timestamp = formatTimestamp(item.timestamp);
+                tr.innerHTML += `<td class="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
+                    <div class="font-medium">${timestamp}</div>
                 </td>`;
                 
                 // Bagian dikerjakan
                 const bagian = item.bagian || "-";
-                tr.innerHTML += `<td class="px-6 py-4 whitespace-nowrap">
-                    <span class="px-3 py-1.5 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                tr.innerHTML += `<td class="px-4 py-3">
+                    <span class="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                         ${bagian}
                     </span>
                 </td>`;
                 
                 // Ketercapaian pekan ini
                 const ketercapaian = item.ketercapaian || "-";
-                const ketercapaianShort = ketercapaian.length > 60 ? ketercapaian.substring(0, 60) + "..." : ketercapaian;
-                tr.innerHTML += `<td class="px-6 py-4 text-sm text-gray-700" title="${ketercapaian}">${ketercapaianShort}</td>`;
+                const ketercapaianShort = ketercapaian.length > 50 ? ketercapaian.substring(0, 50) + "..." : ketercapaian;
+                tr.innerHTML += `<td class="px-4 py-3 text-sm text-gray-700 truncate-cell" title="${ketercapaian}">${ketercapaianShort}</td>`;
                 
                 // Kendala
                 const kendala = item.kendala || "-";
-                const kendalaShort = kendala.length > 60 ? kendala.substring(0, 60) + "..." : kendala;
-                tr.innerHTML += `<td class="px-6 py-4 text-sm text-gray-700" title="${kendala}">${kendalaShort}</td>`;
+                const kendalaShort = kendala.length > 50 ? kendala.substring(0, 50) + "..." : kendala;
+                tr.innerHTML += `<td class="px-4 py-3 text-sm text-gray-700 truncate-cell" title="${kendala}">${kendalaShort}</td>`;
                 
                 // Solusi
                 const solusi = item.solusi || "-";
@@ -1414,11 +1550,16 @@
                 if (typeof solusi === "string" && (solusi.startsWith("http://") || solusi.startsWith("https://"))) {
                     const displayText = solusi.length > 40 ? solusi.substring(0, 40) + "..." : solusi;
                     solusiHtml = `<a href="${solusi}" target="_blank" class="text-blue-600 hover:text-blue-800 font-medium underline" title="${solusi}">${displayText}</a>`;
-                } else if (solusi.length > 60) {
-                    solusiHtml = `<span title="${solusi}">${solusi.substring(0, 60)}...</span>`;
+                } else if (solusi.length > 50) {
+                    solusiHtml = `<span class="truncate-cell" title="${solusi}">${solusi.substring(0, 50)}...</span>`;
                 }
                 
-                tr.innerHTML += `<td class="px-6 py-4 text-sm text-gray-700">${solusiHtml}</td>`;
+                tr.innerHTML += `<td class="px-4 py-3 text-sm text-gray-700">${solusiHtml}</td>`;
+                
+                // Rencana Minggu Depan
+                const rencana = item.rencana || "-";
+                const rencanaShort = rencana.length > 50 ? rencana.substring(0, 50) + "..." : rencana;
+                tr.innerHTML += `<td class="px-4 py-3 text-sm text-gray-700 truncate-cell" title="${rencana}">${rencanaShort}</td>`;
                 
                 table.appendChild(tr);
             });
@@ -1455,7 +1596,7 @@
             const table = document.getElementById("progressTable");
             table.innerHTML = `
                 <tr>
-                    <td colspan="5" class="px-6 py-10 text-center">
+                    <td colspan="6" class="px-6 py-10 text-center">
                         <div class="inline-flex items-center px-4 py-3 bg-rose-50 text-rose-700 rounded-lg border border-rose-200">
                             <i class="fas fa-exclamation-triangle mr-3"></i>
                             <div class="text-left">
@@ -1510,6 +1651,7 @@
                 ketercapaian: document.getElementById("ketercapaian").value,
                 kendala: document.getElementById("kendala").value,
                 solusi: document.getElementById("solusi").value,
+                rencana: document.getElementById("rencana").value,
                 timestamp: timestampForSheets // Format untuk Google Sheets
             };
             
